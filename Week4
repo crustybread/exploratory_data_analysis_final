@@ -1,0 +1,67 @@
+rm(list=ls()); gc(); dev.off()
+
+library(data.table)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+
+#create source data frame
+Sys.setlocale("LC_TIME", "en_US.UTF-8")
+setwd("~/documents/exploratory_data_analysis")
+#unzip("exdata-data-NEI_data.zip")
+NEI <- readRDS("summarySCC_PM25.rds")
+SCC <- readRDS("Source_Classification_Code.rds")
+df <- NEI
+
+
+#plot6
+#Compare emissions from motor vehicle sources in Baltimore City with emissions from motor vehicle
+#sources in Los Angeles County, California (fips == "06037"). Which city has seen greater
+#changes over time in motor vehicle emissions?
+png(filename="Plot6.png", width = 480, height = 480)
+df6 <- df[,c(1,2,4,5,6)]
+df6balt <- subset(df6, df6$fips == "24510")
+df6la <- subset(df6, df6$fips == "06037")
+df6t <- SCC[,c(1,4)]
+
+df6q <- subset(df6t, grepl("Mobile", df6t$EI.Sector))
+df6q <- as.matrix(df6q)
+
+df6b <- merge(df6balt, df6q, by = "SCC")
+df6l <- merge(df6la, df6q, by = "SCC")
+
+df6b <- df6b[,c(2,3,4,5,6)]
+df6l <- df6l[,c(2,3,4,5,6)]
+
+names(df6b) <- c("fips","emissions","type","year","sector")
+names(df6l) <- c("fips","emissions","type","year","sector")
+
+df6b$sector <- gsub("Mobile - ", "", df6b$sector)
+df6l$sector <- gsub("Mobile - ", "", df6l$sector)
+
+df6b$fips <- as.factor(df6b$fips)
+df6b$type <- as.factor(df6b$type)
+df6b$year <- as.factor(df6b$year)
+df6b$sector <- as.factor(df6b$sector)
+
+df6l$fips <- as.factor(df6l$fips)
+df6l$type <- as.factor(df6l$type)
+df6l$year <- as.factor(df6l$year)
+df6l$sector <- as.factor(df6l$sector)
+
+df6b <- arrange(df6b,fips,sector,type,year)
+df6l <- arrange(df6l,fips,sector,type,year)
+
+df6b <- aggregate(emissions~sector + year + fips, data = df6b, mean)
+df6l <- aggregate(emissions~sector + year + fips, data = df6l, mean)
+
+visuals <- rbind(df6b,df6l)
+
+ggplot(visuals, aes(x=sector,y=emissions,group=fips,col=fips)) + 
+  geom_point(alpha = 0.65)+facet_grid(. ~ year) + theme(axis.text.x = element_text(angle=90)) + 
+  xlab("Mobile transport type") + ylab("Emissions (in tons)") +
+  ggtitle("Mean Emissions in Baltimore (24510) versus LA (06037) by Mobile Sector") +
+  labs(col =  "County Code") +
+  theme(plot.title = element_text(size = rel(1)))
+
+dev.off()
